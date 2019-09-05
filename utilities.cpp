@@ -5,6 +5,10 @@
 #include <vector>
 
 using namespace std;
+
+vector<string> tokens;
+int count;
+
 vector<string> splitInput(int &ref, char* str) 
 { 
     string command = str;
@@ -12,8 +16,6 @@ vector<string> splitInput(int &ref, char* str)
     string word; 
     //char** tokens = ( char**)malloc(sizeof( char*) * MAXY_TOKENS);
     //string tokens[MAXY_TOKENS];
-    vector<string> tokens;
-    int i;
     /*
     for(i = 0; i < MAXY_TOKENS; ++i)
     {
@@ -22,18 +24,20 @@ vector<string> splitInput(int &ref, char* str)
     */
     
     stringstream iss(command); 
+
+    tokens.clear();
   
-    i = 0;
+    count = 0;
     while (iss >> word) 
     {
         //char *currentWord = (char*)word.c_str();
         //tokens[i] = currentWord;
         tokens.push_back(word);
         //cout<<"current token being stored: "<<currentWord<<"\n";
-        ++i;
+        ++count;
     }
     //Now, i = number of tokens
-    ref = i;
+    ref = count;
 
     /*
     for(int index = 0; index < i; ++index)
@@ -44,4 +48,54 @@ vector<string> splitInput(int &ref, char* str)
 
     return tokens; 
 } 
+
+
+bool checkThisInTokens(string special)
+{
+    for(int i = 0; i < count; ++i)
+    {
+        if(tokens[i] == special)
+        {
+            return true;
+            break;
+        }
+    }
+    return false;
+}
+
+// backgroundProc functions
+backgroundProc::backgroundProc(pid_t backId)
+{
+    bgId = backId;
+    exitStatus = 999;
+}
+
+backgroundProc::backgroundProc()
+{ 
+    exitStatus = 999;
+}
+
+pid_t backgroundProc::getBgId()
+{
+    return bgId;
+}
+
+int backgroundProc::getExitStatus()
+{
+    return exitStatus;
+}
+
+void backgroundProc::setExitStatus(int status)
+{
+    exitStatus = status;
+}
   
+void backgroundProc::setSTDOUT(int fd)
+{
+    stdoutFD = fd;
+}
+
+int backgroundProc::getSTDOUT()
+{
+    return stdoutFD;
+}
