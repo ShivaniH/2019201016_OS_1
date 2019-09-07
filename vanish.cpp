@@ -31,6 +31,7 @@
 #include "utilities.hpp"
 #include "background.hpp"
 #include "redirection.hpp"
+#include "piping.hpp"
 
 using namespace std;
 
@@ -62,6 +63,8 @@ int main()
             exit(EXIT_FAILURE);
         }
 
+        //cout<<"The shmid parent has is "<<sharedMemSegID<<"\n";
+
         char **commandWords;
         commandWords = (char**)shmat(sharedMemSegID, NULL, 0);   //NULL -> The system will automatically look for an address to attach the segment
 
@@ -73,10 +76,9 @@ int main()
 
         /*******************************ACCEPTING USER INPUT**************************************/
         int index = 0;
-        char input;
+        char input; 
         //cin>>input;
         input = cin.get();
-
         //int testVar = 7;
         
         while(input != '\n' && input != '\t')
@@ -87,8 +89,10 @@ int main()
             input = cin.get();
             //std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             //cout<<"Just stuck here\n";
+            //cout<<"Came back here\n";
         }
         command[index] = '\0';
+        //cout<<"Really took the input\n";
 
         int numTokens = 0;
         int &ref = numTokens;
@@ -108,6 +112,7 @@ int main()
             commandWords[numTokens-1] = NULL;
 
             fd = (int*)malloc(sizeof(int)*2);
+
             backgroundDealer(bg, fd);
 
             int shMSID = shmget((key_t)1098, sizeof(int), SHM_PERM);
@@ -195,6 +200,7 @@ int main()
         }
         else if(checkThisInTokens("cd"))
         {
+            cout<<"path is "<<toks[2]<<"\n";
             if (chdir(toks[2].c_str()) != 0) 
             {
                 cout<<"Please specify a path for cd\n";
@@ -228,17 +234,70 @@ int main()
             commandWords[i] = NULL;
             outputRedirection(toks, i, ">>", "a");
         }
-        else if(checkThisInTokens("<<"))
-        {
-            
-        }
-        else if(checkThisInTokens("<"))
-        {
-            
-        }
         else if(checkThisInTokens("|"))
         {
+            /********************************** PIPES ************************************************/
+            int i, j, k;
+            //int pipeFD[2];
+            //pipe(pipeFD);
+            //cout<<"pipefd[0] = "<<pipeFD[0]<<" "<<pipeFD[1]<<"\n";
+            //int (&piperef)[2] = pipeFD;
+            bool first = true;
+            bool last = false;
             
+            int numCommands = 1;
+            for(i = 0; i < numTokens; ++i)
+            {
+                if(toks[i] == "|")
+                {
+                    ++numCommands;
+                }
+            }   
+
+            int pipeFD[numCommands][2]; //read from current, write to next
+
+            //test with: ls | grep c | grep v | wc
+            
+            int (*pipePtr)[2] = pipeFD;
+            for(i = 0; i < numCommands; ++i)
+            {
+                pipe(pipeFD[i]);
+                cout<<"pipe[0] =  "<<pipeFD[i][0]<<" pipe[1] = "<<pipeFD[i][1]<<"\n";
+            }
+
+            //int (&piperef)[][2] = pipeFD;
+            
+
+            for(i = 0, j = 0, k = 0; i < numTokens; ++i)
+            {
+                if(toks[i] != "|" )
+                {
+                    commandWords[k] = (char*)toks[i].c_str();
+                    //cout<<"Stored "<<commandWords[k]<<" now\n";
+                    ++k;
+                }
+                else
+                {
+                    commandWords[k] = NULL;
+                    /*
+                    cout<<"position k = "<<k<<" was set to NULL\n";
+                    cout<<"There's a pipe now\n";
+                    */
+                    
+                    k = 0;
+                    piping(j, numCommands, pipePtr ,first, last);
+                    ++j;
+                    //cout<<"I'm gonna call piping for "<<commandWords[0]<<" now\n";
+                    first = false;
+                }
+            }
+            //for the final command
+            last = true;
+            commandWords[k] = NULL;
+            k = 0;
+            cout<<"I'm gonna call piping for "<<commandWords[0]<<" now\n";
+            piping(j, numCommands, pipePtr ,first, last);
+            cout<<"I'm out, bye bye\n";
         }
         else {
             /************************************NORMAL CASE****************************************/
@@ -311,6 +370,7 @@ int main()
         }
 
         free(command);
+        fflush(stdout);
     }
     return 0;
 }
