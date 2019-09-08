@@ -3,3 +3,4 @@ HOME = /home/shivanih/
 USER = shivanih
 HOSTNAME = localhost.localdomain
 PS1 = $
+alias c = cal

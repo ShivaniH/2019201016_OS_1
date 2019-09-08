@@ -9,6 +9,7 @@
 #include <string.h>
 #include <string>
 #include <algorithm>
+#include <map>
 
 /*-------------------------------------
 | POSIX header files              |
@@ -37,9 +38,10 @@
 
 using namespace std;
 
-/****************************************** ENVIRONMENT SETUP ******************************************************/
-
-void envSetup(string &prompt)
+/*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       ENVIRONMENT SETUP        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
+void envSetup(string &prompt, map<string, vector<string>> &mapRef)
 {
     FILE *vanishrc = fopen(".vanishrc", "r+");
     vector<string> envVars;
@@ -83,14 +85,34 @@ void envSetup(string &prompt)
             //cout<<"here?\n";
             if(ptr != NULL) value = ptr->pw_dir;
         }
+        int x;
+        int &refx = x;
+        vector<string> alAndName = splitInput(x, (char*)varName.c_str());
+        if( alAndName[0] == "alias" )
+        {
+            int numFToks = 0;
+            int &numFToksRef = numFToks;
+            vector<string> fakenomToks = splitInput(numFToksRef, (char*)value.c_str());
+            mapRef.insert(make_pair(alAndName[1], fakenomToks));
+            
+            /*cout<<"Printing map\n";
+            auto it = mapRef.begin();
+            for(int i = 0; i < fakenomToks.size(); ++i)
+            {
+                cout<<it->second[i];
+            }
+            */
+        }
         //cout<<"varname is "<<varName<<" and its value is"<<value<<"\n";
-        setenv(varName.c_str(), value.c_str(), 1);
+        if(alAndName[0] != "alias") setenv(varName.c_str(), value.c_str(), 1);
         //cout<<"Fine till here\n";
     }
     prompt += " ";
 }
 
-/*********************************************** MAIN ************************************************/
+/*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       MAIN        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
 
 int main()
 {
@@ -102,7 +124,10 @@ int main()
 
     string &promptRef = vaniPrompt;
 
-    envSetup(promptRef);
+    map<string, vector<string>> akas;
+    map<string, vector<string>> &akaRef = akas;
+
+    envSetup(promptRef, akaRef);
 
     int childStatus = 0;
     int &childRef = childStatus;
@@ -198,10 +223,59 @@ int main()
                 }
             }
         }
-        
-        if(checkThisInTokens("&"))
+
+        if(checkThisInTokens("~"))
         {
-            /*********************************BACKGROUND PROCESS******************************************/
+            for(int i = 0; i < numTokens; ++i)
+            {
+                if(toks[i] == "~")
+                {
+                    string homeDir = getenv("HOME");
+                    toks[i] = homeDir; 
+                }
+            }
+        }
+
+        for(int i = 0; i < numTokens; ++i)
+        {
+            if (akas.find(toks[i]) != akas.end())
+            {
+                //cout<<"This worked for alias = "<<toks[i]<<"\n";
+                vector<string> valsToPut = akas[toks[i]];
+                //cout<<"vals to put size = "<<valsToPut.size()<<"\n";
+                for(int j = 0; j < valsToPut.size(); ++j)
+                {
+                    toks.insert(toks.begin()+i+j, valsToPut[j]);
+                    if(j > 0) ++numTokens;
+                }
+
+                /*cout<<"updated tokens = \n";
+                for(int j = 0; j < numTokens; ++j)
+                {
+                    cout<<toks[j]<<"\n";
+                }
+                */
+            }
+        }
+
+        if(checkThisInTokens("alias"))
+        {
+            vector<string> pseuNoms;
+            string pseudonym = toks[1];
+            string realComm;
+            for(int k = 3; k < numTokens; ++k) realComm = realComm + toks[k] + " ";  //has single quotes, get rid of them
+            //cout<<"realComm is "<<realComm<<"\n";
+            realComm.erase(remove(realComm.begin(), realComm.end(), '\''), realComm.end());
+            int numPseus;
+            int &numPseusRef = numPseus;
+            pseuNoms = splitInput(numPseusRef, (char*)realComm.c_str());
+            akas.insert(make_pair(pseudonym, pseuNoms));
+        }
+        else if(checkThisInTokens("&"))
+        {
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       BACKGROUND PROCESS        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
 
             for(int i = 0; i < numTokens; ++i)
             {
@@ -236,6 +310,7 @@ int main()
         else if(checkThisInTokens("fg"))
         {
             /************************************BACK TO FOREGROUND*********************************************/
+            
             signal(SIGTTOU, SIG_IGN);
             //int childStatus;
             pid_t deadOrAlive;
