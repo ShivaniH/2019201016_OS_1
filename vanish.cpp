@@ -8,6 +8,7 @@
 #include <limits>
 #include <string.h>
 #include <string>
+#include <algorithm>
 
 /*-------------------------------------
 | POSIX header files              |
@@ -21,6 +22,7 @@
 #include <errno.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <pwd.h>
 
 //Refer: https://support.sas.com/documentation/onlinedoc/sasc/doc750/html/lr2/z2101586.htm
 
@@ -35,19 +37,83 @@
 
 using namespace std;
 
-/****************************************** MAIN ******************************************************/
+/****************************************** ENVIRONMENT SETUP ******************************************************/
+
+void envSetup(string &prompt)
+{
+    FILE *vanishrc = fopen(".vanishrc", "r+");
+    vector<string> envVars;
+    char line[500];
+    while (1) {
+        if (fgets(line, 500, vanishrc) == NULL) break;
+        envVars.push_back(line);
+    }
+
+    string varName, value;
+    uid_t currentUser;
+    currentUser = getuid();
+    struct passwd *ptr = getpwuid(currentUser);
+   
+    for(int i = 0; i < envVars.size(); ++i)
+    {
+        string::size_type eqPos = envVars[i].find('=');
+        varName = envVars[i].substr(0, eqPos-1);
+        value = envVars[i].substr(eqPos+2);     //These magic numbers are cause of the spaces
+        value.erase(remove(value.begin(), value.end(), '\n'), value.end());
+        
+        if( varName == "PS1")
+        {
+            prompt += value;
+            //cout<<"value of prompt is "<<value<<" which is = "<<prompt<<"\n";        
+        }
+        if (varName == "USER")
+        {
+            if(ptr != NULL) value = ptr->pw_name;
+            prompt = value + "@";
+            //Should you write it back to vanishrc?
+        }
+        if(varName == "HOSTNAME")
+        {
+            char hostname[1024];
+            gethostname(hostname, 1024);
+            value = hostname;
+            prompt += value;
+        }
+        if( varName == "HOME")
+        {
+            //cout<<"here?\n";
+            if(ptr != NULL) value = ptr->pw_dir;
+        }
+        //cout<<"varname is "<<varName<<" and its value is"<<value<<"\n";
+        setenv(varName.c_str(), value.c_str(), 1);
+        //cout<<"Fine till here\n";
+    }
+    prompt += " ";
+}
+
+/*********************************************** MAIN ************************************************/
 
 int main()
 {
+    string vaniPrompt;
+
+    /*
     struct termios term;
 
     tcgetattr (STDIN_FILENO, & term);
     term.c_lflag &= ~(ICANON);
     tcsetattr (STDIN_FILENO, TCSAFLUSH, & term);
+    */
 
     int shmFlags = IPC_CREAT | SHM_PERM;
 
     vector<backgroundProc> bg;
+
+    string &promptRef = vaniPrompt;
+
+    envSetup(promptRef);
+
+    bool rootMode = false;
 
     //cout<<"pid of vanish = "<<getpid()<<" and group id of vanish = "<<getpgid(getpid());
     while(true)
@@ -75,6 +141,8 @@ int main()
         }
 
         /*******************************ACCEPTING USER INPUT**************************************/
+        cout<<vaniPrompt;
+        
         int index = 0;
         char input; 
         //cin>>input;
@@ -100,6 +168,12 @@ int main()
         vector<string> toks;
         toks = splitInput(ref, command);
 
+        if( strncasecmp("su",command,2) == 0 || strncasecmp("su root",command,7) == 0 )
+        {
+            rootMode = true;
+            setenv("PS1","#",1);
+        }
+        
         if(checkThisInTokens("&"))
         {
             /*********************************BACKGROUND PROCESS******************************************/
@@ -200,14 +274,20 @@ int main()
         }
         else if(checkThisInTokens("cd"))
         {
-            cout<<"path is "<<toks[2]<<"\n";
-            if (chdir(toks[2].c_str()) != 0) 
+            //cout<<"Ok till here\n";
+            //cout<<"path is "<<toks[1]<<"\n";
+            if (chdir(toks[1].c_str()) != 0) 
             {
-                cout<<"Please specify a path for cd\n";
+                cout<<"Please specify a valid path for cd\n";
             }
         }
         else if(checkThisInTokens("exit"))
         {
+            if(rootMode)
+            {
+                rootMode = false;
+                setenv("PS1","$",1);
+            }
             return 0;
         }
         else if(checkThisInTokens(">"))

@@ -1,0 +1,5 @@
+PATH = /home/shivanih/.local/bin:/home/shivanih/bin:/usr/share/Modules/bin:/usr/lib64/ccache:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/home/shivanih/IIITH/PG1/OS/2019201016_assignment_1:/home/shivanih/IIITH/PG1/OS/2019201016_assignment_1:/home/shivanih/IIITH/PG1/OS/2019201016_assignment_1
+HOME = /home/shivanih/
+USER = shivanih
+HOSTNAME = localhost.localdomain
+PS1 = $
