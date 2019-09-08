@@ -10,4 +10,4 @@ using namespace std;
 
 //int pipeFD[2];
 
-void piping(int currentPipe, int numCommands, int (*pipePtr)[2], bool first, bool last);
+void piping(int currentPipe, int numCommands, int (*pipePtr)[2], bool first, bool last, int &childStatus);

@@ -19,7 +19,7 @@
 
 using namespace std;
 
-void outputRedirection(vector<string> toks, int i, string operat, const char *mode)
+void outputRedirection(vector<string> toks, int i, string operat, const char *mode, int &childStatus)
 {
     FILE *fp = fopen(toks[++i].c_str(), mode);
     if(fp == NULL && operat == ">")
@@ -35,7 +35,7 @@ void outputRedirection(vector<string> toks, int i, string operat, const char *mo
     {
         // I am the parent
 
-        int childStatus;
+        //int childStatus;
         pid_t waitRet = waitpid(childPid, &childStatus, 0);
 
         if(waitRet != childPid)

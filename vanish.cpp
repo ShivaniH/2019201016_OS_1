@@ -70,7 +70,6 @@ void envSetup(string &prompt)
         {
             if(ptr != NULL) value = ptr->pw_name;
             prompt = value + "@";
-            //Should you write it back to vanishrc?
         }
         if(varName == "HOSTNAME")
         {
@@ -97,14 +96,6 @@ int main()
 {
     string vaniPrompt;
 
-    /*
-    struct termios term;
-
-    tcgetattr (STDIN_FILENO, & term);
-    term.c_lflag &= ~(ICANON);
-    tcsetattr (STDIN_FILENO, TCSAFLUSH, & term);
-    */
-
     int shmFlags = IPC_CREAT | SHM_PERM;
 
     vector<backgroundProc> bg;
@@ -113,7 +104,18 @@ int main()
 
     envSetup(promptRef);
 
+    int childStatus = 0;
+    int &childRef = childStatus;
+
     bool rootMode = false;
+
+    /*
+    struct termios term;
+
+    tcgetattr (STDIN_FILENO, & term);
+    term.c_lflag &= ~(ICANON);
+    tcsetattr (STDIN_FILENO, TCSAFLUSH, & term);
+    */
 
     //cout<<"pid of vanish = "<<getpid()<<" and group id of vanish = "<<getpgid(getpid());
     while(true)
@@ -173,6 +175,29 @@ int main()
             rootMode = true;
             setenv("PS1","#",1);
         }
+
+        if(checkThisInTokens("$$"))
+        {
+            for(int i = 0; i < numTokens; ++i)
+            {
+                if(toks[i] == "$$")
+                {
+                    int procId = getpid();
+                    toks[i] = to_string(procId); 
+                }
+            }
+        }
+
+        if(checkThisInTokens("$?"))
+        {
+            for(int i = 0; i < numTokens; ++i)
+            {
+                if(toks[i] == "$?")
+                {
+                    toks[i] = to_string(childStatus);
+                }
+            }
+        }
         
         if(checkThisInTokens("&"))
         {
@@ -212,7 +237,7 @@ int main()
         {
             /************************************BACK TO FOREGROUND*********************************************/
             signal(SIGTTOU, SIG_IGN);
-            int childStatus;
+            //int childStatus;
             pid_t deadOrAlive;
             int i;
             for(i = 0; i < bg.size(); ++i)
@@ -300,7 +325,7 @@ int main()
             }
 
             commandWords[i] = NULL;
-            outputRedirection(toks, i, ">", "r+");
+            outputRedirection(toks, i, ">", "r+", childRef);
         }
         else if(checkThisInTokens(">>"))
         {
@@ -312,7 +337,7 @@ int main()
             }
 
             commandWords[i] = NULL;
-            outputRedirection(toks, i, ">>", "a");
+            outputRedirection(toks, i, ">>", "a", childRef);
         }
         else if(checkThisInTokens("|"))
         {
@@ -365,7 +390,7 @@ int main()
                     */
                     
                     k = 0;
-                    piping(j, numCommands, pipePtr ,first, last);
+                    piping(j, numCommands, pipePtr ,first, last, childRef);
                     ++j;
                     //cout<<"I'm gonna call piping for "<<commandWords[0]<<" now\n";
                     first = false;
@@ -376,7 +401,7 @@ int main()
             commandWords[k] = NULL;
             k = 0;
             cout<<"I'm gonna call piping for "<<commandWords[0]<<" now\n";
-            piping(j, numCommands, pipePtr ,first, last);
+            piping(j, numCommands, pipePtr ,first, last, childRef);
             cout<<"I'm out, bye bye\n";
         }
         else {
@@ -398,7 +423,6 @@ int main()
                 // I am the parent
 
                 //cout<<"Waiting for my child. . . \n";
-                int childStatus;
                 //pid_t waitRet = wait(childStatus);
                 pid_t waitRet = waitpid(childPid, &childStatus, 0);
                 

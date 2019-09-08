@@ -8,4 +8,4 @@
 
 using namespace std;
 
-void outputRedirection(vector<string> toks, int i, string operat, const char *mode);
+void outputRedirection(vector<string> toks, int i, string operat, const char *mode, int &childStatus);

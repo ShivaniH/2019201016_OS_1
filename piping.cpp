@@ -20,7 +20,7 @@
 using namespace std;
 //int numCommands;
 
-void piping(int currentPipe, int numCommands, int (*pipePtr)[2], bool first, bool last)
+void piping(int currentPipe, int numCommands, int (*pipePtr)[2], bool first, bool last, int &childStatus)
 {
     int pipeFD[numCommands][2];
        
@@ -34,7 +34,7 @@ void piping(int currentPipe, int numCommands, int (*pipePtr)[2], bool first, boo
     {
         // I am the parent
 
-        int childStatus;
+        //int childStatus;
         //pid_t waitRet = wait(childStatus);
         cout<<"I'm now waiting for child "<<childPid<<"\n";
         if(first) close(pipeFD[currentPipe][0]);
