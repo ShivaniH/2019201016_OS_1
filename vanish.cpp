@@ -41,7 +41,7 @@ using namespace std;
 /*----------------------------------------------------------------------------------------------------------------------------------------
                                             |       ENVIRONMENT SETUP        |
 ----------------------------------------------------------------------------------------------------------------------------------------*/
-void envSetup(string &prompt, map<string, vector<string>> &mapRef)
+void envSetup(string &prompt, map<string, vector<string>> &mapRef, map<string, string> &mulMedRef)
 {
     FILE *vanishrc = fopen(".vanishrc", "r+");
     vector<string> envVars;
@@ -103,11 +103,23 @@ void envSetup(string &prompt, map<string, vector<string>> &mapRef)
             }
             */
         }
+        if( varName == "MEDIA" )
+        {
+            value.erase(remove(value.begin(), value.end(), '['), value.end());
+            value.erase(remove(value.begin(), value.end(), ']'), value.end());
+            value.erase(remove(value.begin(), value.end(), ','), value.end());
+            int numMeds = 0;
+            int &numMedsRef = numMeds;
+            vector<string> oneMedia = splitInput(numMedsRef, (char*)value.c_str());
+            mulMedRef.insert(make_pair(oneMedia[2],oneMedia[1]));   //{file extension: apppath}
+        }
         //cout<<"varname is "<<varName<<" and its value is"<<value<<"\n";
-        if(alAndName[0] != "alias") setenv(varName.c_str(), value.c_str(), 1);
+        if(alAndName[0] != "alias" && varName != "MEDIA") setenv(varName.c_str(), value.c_str(), 1);
         //cout<<"Fine till here\n";
     }
     prompt += " ";
+    fclose(vanishrc);
+
 }
 
 /*----------------------------------------------------------------------------------------------------------------------------------------
@@ -116,6 +128,8 @@ void envSetup(string &prompt, map<string, vector<string>> &mapRef)
 
 int main()
 {
+    //BUNCH OF VARIABLE DECLARATIONS
+
     string vaniPrompt;
 
     int shmFlags = IPC_CREAT | SHM_PERM;
@@ -127,7 +141,12 @@ int main()
     map<string, vector<string>> akas;
     map<string, vector<string>> &akaRef = akas;
 
-    envSetup(promptRef, akaRef);
+    map<string, string> mulMed;
+    map<string, string> &mulMedRef = mulMed;
+
+    string oldPWD = "";  
+
+    envSetup(promptRef, akaRef, mulMedRef);
 
     int childStatus = 0;
     int &childRef = childStatus;
@@ -167,7 +186,9 @@ int main()
             exit(EXIT_FAILURE);
         }
 
-        /*******************************ACCEPTING USER INPUT**************************************/
+        /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       ACCEPTING USER INPUT        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
         cout<<vaniPrompt;
         
         int index = 0;
@@ -195,10 +216,22 @@ int main()
         vector<string> toks;
         toks = splitInput(ref, command);
 
-        if( strncasecmp("su",command,2) == 0 || strncasecmp("su root",command,7) == 0 )
+        if( strncmp("su",command,2) == 0 || strncmp("su root",command,7) == 0 || strncmp("sudo su",command,7) == 0 )
         {
             rootMode = true;
             setenv("PS1","#",1);
+        }
+
+        if(checkThisInTokens("open"))
+        {
+            string::size_type dotPos = toks[1].find('.');
+            string extension = toks[1].substr(dotPos);
+            //cout<<"The extension is "<<extension<<"\n";
+            if(mulMed.find(extension) != mulMed.end())
+            {
+                toks[0] = mulMed[extension];
+            }
+            //cout<<"Opening "<<toks[1]<<" using "<<mulMed[extension]<<"\n";
         }
 
         if(checkThisInTokens("$$"))
@@ -221,6 +254,15 @@ int main()
                 {
                     toks[i] = to_string(childStatus);
                 }
+            }
+        }
+
+        for(int i = 0; i < numTokens; ++i)
+        {
+            if(toks[i][0]=='$')
+            {
+                string envy = toks[i].substr(1);
+                toks[i] = getenv(envy.c_str());
             }
         }
 
@@ -309,7 +351,9 @@ int main()
         }
         else if(checkThisInTokens("fg"))
         {
-            /************************************BACK TO FOREGROUND*********************************************/
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       BACK TO FOREGROUND        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
             
             signal(SIGTTOU, SIG_IGN);
             //int childStatus;
@@ -376,9 +420,22 @@ int main()
         {
             //cout<<"Ok till here\n";
             //cout<<"path is "<<toks[1]<<"\n";
+            if(toks[1] == "-")
+            {
+                if(oldPWD == "")
+                {
+                    cout<<"You have not changed to any directory before this\n";
+                }
+                else {
+                    toks[1] = oldPWD;
+                }
+            }
             if (chdir(toks[1].c_str()) != 0) 
             {
                 cout<<"Please specify a valid path for cd\n";
+            }
+            else {
+                oldPWD = toks[1];
             }
         }
         else if(checkThisInTokens("exit"))
@@ -392,7 +449,9 @@ int main()
         }
         else if(checkThisInTokens(">"))
         {
-            /************************************** OUTPUT REDIRECTION **********************************************/
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       OUTPUT REDIRECTION        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
             int i;
             for(i = 0; i < numTokens && toks[i] != ">"; ++i)
             {
@@ -404,7 +463,9 @@ int main()
         }
         else if(checkThisInTokens(">>"))
         {
-            /************************************** OUTPUT REDIRECTION APPEND **********************************************/
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       OUTPUT REDIRECTION APPEND        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
             int i;
             for(i = 0; i < numTokens && toks[i] != ">>"; ++i)
             {
@@ -416,7 +477,9 @@ int main()
         }
         else if(checkThisInTokens("|"))
         {
-            /********************************** PIPES ************************************************/
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |       PIPES       |
+----------------------------------------------------------------------------------------------------------------------------------------*/
             int i, j, k;
             //int pipeFD[2];
             //pipe(pipeFD);
@@ -480,7 +543,9 @@ int main()
             cout<<"I'm out, bye bye\n";
         }
         else {
-            /************************************NORMAL CASE****************************************/
+            /*----------------------------------------------------------------------------------------------------------------------------------------
+                                            |      NORMAL CASE        |
+----------------------------------------------------------------------------------------------------------------------------------------*/
 
             for(int i = 0; i < numTokens; ++i)
             {
