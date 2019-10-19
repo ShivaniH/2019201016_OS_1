@@ -1,2 +1,2 @@
-# 2019201016_OSassignment_1
+# A POSIX-compliant Linux shell -- Vanish
 Operating Systems (PG) assignment 1
